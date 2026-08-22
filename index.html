@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#3b6fed" />
+  <!-- Add-to-home-screen support -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Keeping Stock" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;800&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=5" />
+  <link rel="icon" href="icon.svg?v=5" type="image/svg+xml" />
+  <title>Keeping Stock</title>
+  <link rel="stylesheet" href="styles.css?v=5" />
+</head>
+<body class="theme-toiletries">
+  <div class="app">
+    <header class="app-header">
+      <img class="brand-logo" src="icon.svg?v=5" alt="" width="44" height="44" />
+      <h1 class="brand-title"><span class="brand-title-thin">Keeping</span> <span class="brand-title-bold">Stock</span></h1>
+    </header>
+
+    <p id="sync-note" class="sync-note" hidden></p>
+
+    <main>
+      <!-- Toiletries view -->
+      <section id="view-toiletries" class="view" aria-label="Toiletries">
+        <ul id="list-toiletries" class="item-list" aria-live="polite"></ul>
+        <p id="empty-toiletries" class="empty-state" hidden>Nothing here yet.</p>
+        <button type="button" class="add-item-btn" data-category="toiletries">+ Add item</button>
+      </section>
+
+      <!-- Food view -->
+      <section id="view-food" class="view" aria-label="Food" hidden>
+        <ul id="list-food" class="item-list" aria-live="polite"></ul>
+        <p id="empty-food" class="empty-state" hidden>Nothing here yet.</p>
+        <button type="button" class="add-item-btn" data-category="food">+ Add item</button>
+      </section>
+    </main>
+  </div>
+
+  <!-- Bottom tab navigation -->
+  <nav class="tabbar" aria-label="Views">
+    <button class="tab is-active" type="button" data-view="toiletries" aria-current="page">
+      <span class="tab-icon" aria-hidden="true">🧴</span>
+      <span>Toiletries</span>
+    </button>
+    <button class="tab" type="button" data-view="food">
+      <span class="tab-icon" aria-hidden="true">🥫</span>
+      <span>Food</span>
+    </button>
+  </nav>
+
+  <!-- Add-item modal -->
+  <div id="add-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title">Add item</h2>
+      <form id="add-form">
+        <label for="name-input">Item name</label>
+        <input id="name-input" name="name" type="text" autocomplete="off" placeholder="e.g. Toothpaste" required />
+
+        <label for="count-input">Starting count</label>
+        <input id="count-input" name="count" type="number" inputmode="numeric" min="0" step="1" value="1" required />
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+          <button type="submit" class="btn btn-primary">Add</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Rename modal -->
+  <div id="rename-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-rename-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="rename-title">
+      <h2 id="rename-title">Edit item</h2>
+      <form id="rename-form">
+        <label for="rename-input">Item name</label>
+        <input id="rename-input" name="name" type="text" autocomplete="off" required />
+        <label for="rename-notes-input">Where is it? (optional)</label>
+        <input id="rename-notes-input" name="notes" type="text" autocomplete="off" placeholder="e.g. hall closet, top shelf" />
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-rename-close>Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Supabase client (no build step) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="app.js?v=4"></script>
+</body>
+</html>

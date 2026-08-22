@@ -1,0 +1,13 @@
+{
+  "name": "Keeping Stock",
+  "short_name": "Keeping Stock",
+  "description": "Track toiletries and food inventory at home",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f7f8fb",
+  "theme_color": "#3b6fed",
+  "icons": [
+    { "src": "icon.svg?v=5", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "apple-touch-icon.png?v=5", "type": "image/png", "sizes": "180x180" }
+  ]
+}
