@@ -1,7 +1,8 @@
 (function () {
   'use strict';
 
-  const CATEGORIES = ['toiletries', 'food'];
+  const CATEGORIES = ['toiletries', 'food', 'house'];
+  const CATEGORY_LABELS = { toiletries: 'Toiletries', food: 'Food', house: 'House' };
   const STORAGE_KEY = 'home-stock-items-v1';
 
   const SEED_ITEMS = [
@@ -26,6 +27,10 @@
   let items = [];
 
   const syncNote = document.getElementById('sync-note');
+  const undoBar = document.getElementById('undo-bar');
+  const undoLabel = document.getElementById('undo-label');
+  const undoBtn = document.getElementById('undo-btn');
+  undoBtn.addEventListener('click', undoDelete);
 
   function uid() {
     return 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -146,24 +151,25 @@
     }
   }
 
-  async function updateItemDetails(id, name, notes) {
+  async function updateItemDetails(id, name, notes, category) {
     name = name.trim();
     notes = notes.trim();
     if (!name) return;
     const item = items.find((it) => it.id === id);
     if (!item) return;
     const conflict = items.find(
-      (it) => it.id !== id && it.category === item.category && it.name.toLowerCase() === name.toLowerCase()
+      (it) => it.id !== id && it.category === category && it.name.toLowerCase() === name.toLowerCase()
     );
     if (conflict) {
-      alert(`"${name}" already exists in this list.`);
+      alert(`"${name}" already exists in ${CATEGORY_LABELS[category]}.`);
       return;
     }
     item.name = name;
     item.notes = notes;
+    item.category = category;
     render();
     if (useSupabase) {
-      const { error } = await supabase.from('items').update({ name, notes }).eq('id', id);
+      const { error } = await supabase.from('items').update({ name, notes, category }).eq('id', id);
       if (error) console.error(error);
     } else {
       localSave(items);
@@ -172,13 +178,109 @@
 
   async function deleteItem(id) {
     items = items.filter((it) => it.id !== id);
-    render();
     if (useSupabase) {
       const { error } = await supabase.from('items').delete().eq('id', id);
       if (error) console.error(error);
     } else {
       localSave(items);
     }
+  }
+
+  // ---------- Swipe-to-delete with undo ----------
+  let pendingDelete = null;
+
+  function showUndoBar(name) {
+    undoLabel.textContent = `Deleted "${name}"`;
+    undoBar.hidden = false;
+  }
+
+  function hideUndoBar() {
+    undoBar.hidden = true;
+  }
+
+  function finalizePendingDelete() {
+    if (!pendingDelete) return;
+    const { item, timer } = pendingDelete;
+    clearTimeout(timer);
+    pendingDelete = null;
+    hideUndoBar();
+    deleteItem(item.id);
+  }
+
+  function swipeDeleteItem(item) {
+    finalizePendingDelete();
+    items = items.filter((it) => it.id !== item.id);
+    render();
+    showUndoBar(item.name);
+    pendingDelete = {
+      item,
+      timer: setTimeout(finalizePendingDelete, 4000),
+    };
+  }
+
+  function undoDelete() {
+    if (!pendingDelete) return;
+    clearTimeout(pendingDelete.timer);
+    const { item } = pendingDelete;
+    pendingDelete = null;
+    items.push(item);
+    render();
+    hideUndoBar();
+  }
+
+  function attachSwipeToDelete(row, item) {
+    let startX = 0;
+    let startY = 0;
+    let dragging = false;
+    let swiping = false;
+
+    row.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      startX = e.clientX;
+      startY = e.clientY;
+      dragging = true;
+      swiping = false;
+      row.style.transition = 'none';
+    });
+
+    row.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (!swiping) {
+        if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+          swiping = true;
+          row.setPointerCapture(e.pointerId);
+        } else if (Math.abs(dy) > 8) {
+          dragging = false;
+          return;
+        } else {
+          return;
+        }
+      }
+      const clamped = Math.max(0, Math.min(dx, row.offsetWidth));
+      row.style.transform = `translateX(${clamped}px)`;
+      e.preventDefault();
+    });
+
+    function finishDrag(e) {
+      if (!dragging) return;
+      dragging = false;
+      if (!swiping) return;
+      swiping = false;
+      const dx = e.clientX - startX;
+      const threshold = row.offsetWidth * 0.4;
+      row.style.transition = 'transform 0.2s ease';
+      if (dx > threshold) {
+        row.style.transform = 'translateX(100%)';
+        setTimeout(() => swipeDeleteItem(item), 150);
+      } else {
+        row.style.transform = 'translateX(0)';
+      }
+    }
+
+    row.addEventListener('pointerup', finishDrag);
+    row.addEventListener('pointercancel', finishDrag);
   }
 
   // ---------- Rendering ----------
@@ -194,19 +296,40 @@
       emptyState.hidden = rows.length > 0;
 
       rows.forEach((item) => {
-        const li = document.createElement('li');
-        li.className = 'item-row';
-        li.dataset.id = item.id;
+        const wrap = document.createElement('li');
+        wrap.className = 'item-row-wrap';
+        wrap.dataset.id = item.id;
+
+        const deleteBg = document.createElement('div');
+        deleteBg.className = 'item-row-delete-bg';
+        deleteBg.textContent = 'Delete';
+        deleteBg.setAttribute('aria-hidden', 'true');
+
+        const row = document.createElement('div');
+        row.className = 'item-row';
 
         const info = document.createElement('div');
         info.className = 'item-info';
         info.tabIndex = 0;
         info.addEventListener('click', () => openRenameModal(item));
 
+        const nameRow = document.createElement('span');
+        nameRow.className = 'item-name-row';
+
         const nameSpan = document.createElement('span');
         nameSpan.className = 'item-name';
         nameSpan.textContent = item.name;
-        info.appendChild(nameSpan);
+        nameRow.appendChild(nameSpan);
+
+        if (item.count === 0) {
+          const flag = document.createElement('span');
+          flag.className = 'low-flag';
+          flag.textContent = '❗';
+          flag.setAttribute('aria-hidden', 'true');
+          nameRow.appendChild(flag);
+        }
+
+        info.appendChild(nameRow);
 
         if (item.notes) {
           const notesSpan = document.createElement('span');
@@ -229,13 +352,6 @@
         const countSpan = document.createElement('span');
         countSpan.className = 'item-count';
         countSpan.textContent = item.count;
-        if (item.count === 0) {
-          const flag = document.createElement('span');
-          flag.className = 'low-flag';
-          flag.textContent = '❗';
-          flag.setAttribute('aria-hidden', 'true');
-          countSpan.appendChild(flag);
-        }
 
         const plusBtn = document.createElement('button');
         plusBtn.type = 'button';
@@ -244,18 +360,11 @@
         plusBtn.setAttribute('aria-label', `Add one ${item.name}`);
         plusBtn.addEventListener('click', () => setCount(item.id, item.count + 1));
 
-        const deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.className = 'item-delete';
-        deleteBtn.textContent = '🗑️';
-        deleteBtn.setAttribute('aria-label', `Delete ${item.name}`);
-        deleteBtn.addEventListener('click', () => {
-          if (confirm(`Delete "${item.name}" from the list?`)) deleteItem(item.id);
-        });
-
-        controls.append(minusBtn, countSpan, plusBtn, deleteBtn);
-        li.append(info, controls);
-        list.appendChild(li);
+        controls.append(minusBtn, countSpan, plusBtn);
+        row.append(info, controls);
+        wrap.append(deleteBg, row);
+        attachSwipeToDelete(row, item);
+        list.appendChild(wrap);
       });
     });
   }
@@ -268,7 +377,7 @@
       document.querySelectorAll('.view').forEach((v) => {
         v.hidden = v.id !== `view-${view}`;
       });
-      document.body.classList.remove('theme-toiletries', 'theme-food');
+      document.body.classList.remove(...CATEGORIES.map((c) => `theme-${c}`));
       document.body.classList.add(`theme-${view}`);
     });
   });
@@ -284,7 +393,7 @@
     btn.addEventListener('click', () => {
       addCategory = btn.dataset.category;
       document.getElementById('modal-title').textContent =
-        `Add item to ${addCategory === 'toiletries' ? 'Toiletries' : 'Food'}`;
+        `Add item to ${CATEGORY_LABELS[addCategory]}`;
       nameInput.value = '';
       countInput.value = '1';
       addModal.hidden = false;
@@ -307,12 +416,22 @@
   const renameForm = document.getElementById('rename-form');
   const renameInput = document.getElementById('rename-input');
   const renameNotesInput = document.getElementById('rename-notes-input');
+  const renameCategoryInput = document.getElementById('rename-category-input');
+  const renameDeleteBtn = document.getElementById('rename-delete-btn');
   let renameId = null;
+
+  CATEGORIES.forEach((category) => {
+    const option = document.createElement('option');
+    option.value = category;
+    option.textContent = CATEGORY_LABELS[category];
+    renameCategoryInput.appendChild(option);
+  });
 
   function openRenameModal(item) {
     renameId = item.id;
     renameInput.value = item.name;
     renameNotesInput.value = item.notes || '';
+    renameCategoryInput.value = item.category;
     renameModal.hidden = false;
     renameInput.focus();
     renameInput.select();
@@ -320,8 +439,19 @@
 
   renameForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (renameId) await updateItemDetails(renameId, renameInput.value, renameNotesInput.value);
+    if (renameId) {
+      await updateItemDetails(renameId, renameInput.value, renameNotesInput.value, renameCategoryInput.value);
+    }
     renameModal.hidden = true;
+  });
+
+  renameDeleteBtn.addEventListener('click', () => {
+    const item = items.find((it) => it.id === renameId);
+    if (item && confirm(`Delete "${item.name}" from the list?`)) {
+      deleteItem(item.id);
+      render();
+      renameModal.hidden = true;
+    }
   });
 
   renameModal.querySelectorAll('[data-rename-close]').forEach((el) =>

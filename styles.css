@@ -25,6 +25,12 @@ body.theme-food {
   --accent-strong: #8b5cf6;
 }
 
+body.theme-house {
+  --accent: #a3ddbd;
+  --accent-ink: #1c7a46;
+  --accent-strong: #22a566;
+}
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -75,7 +81,27 @@ html, body {
   gap: 8px;
 }
 
+.item-row-wrap {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.item-row-delete-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: var(--danger);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  padding-left: 22px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
 .item-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -84,6 +110,8 @@ html, body {
   border-radius: 14px;
   box-shadow: var(--shadow);
   padding: 10px 12px;
+  touch-action: pan-y;
+  will-change: transform;
 }
 
 .item-info {
@@ -96,7 +124,15 @@ html, body {
 }
 .item-info:active { opacity: 0.7; }
 
+.item-name-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+}
+
 .item-name {
+  flex: 0 1 auto;
   font-size: 16px;
   font-weight: 600;
   overflow: hidden;
@@ -144,7 +180,6 @@ html, body {
 .step-btn:disabled:active { transform: none; }
 
 .item-count {
-  position: relative;
   min-width: 26px;
   text-align: center;
   font-size: 16px;
@@ -153,23 +188,11 @@ html, body {
 }
 
 .low-flag {
-  position: absolute;
-  top: -9px;
-  right: -11px;
+  flex: 0 0 auto;
   font-size: 14px;
   line-height: 1;
+  margin-top: -6px;
 }
-
-.item-delete {
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px 2px;
-  line-height: 1;
-}
-.item-delete:active { opacity: 0.6; }
 
 .empty-state {
   text-align: center;
@@ -273,17 +296,20 @@ html, body {
   margin-top: 14px;
 }
 .modal-card label:first-of-type { margin-top: 0; }
-.modal-card input {
+.modal-card input,
+.modal-card select {
   width: 100%;
   padding: 12px;
   font-size: 16px;
+  font-family: inherit;
   border: 1.5px solid var(--line);
   border-radius: 10px;
   outline: none;
   background: #fff;
   color: var(--ink);
 }
-.modal-card input:focus { border-color: var(--accent-strong); }
+.modal-card input:focus,
+.modal-card select:focus { border-color: var(--accent-strong); }
 
 .modal-actions {
   display: flex;
@@ -292,8 +318,48 @@ html, body {
   margin-top: 18px;
 }
 
-.item-row.removing {
-  opacity: 0;
-  transform: translateX(20px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
+.modal-actions-split {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-actions-right {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  padding-left: 0;
+  padding-right: 0;
+  min-width: 0;
+}
+
+/* Undo bar */
+.undo-bar[hidden] { display: none; }
+.undo-bar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--ink);
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  z-index: 20;
+  font-size: 14px;
+}
+.undo-btn {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
 }

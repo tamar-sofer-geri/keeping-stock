@@ -16,7 +16,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=5" />
   <link rel="icon" href="icon.svg?v=5" type="image/svg+xml" />
   <title>Keeping Stock</title>
-  <link rel="stylesheet" href="styles.css?v=6" />
+  <link rel="stylesheet" href="styles.css?v=10" />
 </head>
 <body class="theme-toiletries">
   <div class="app">
@@ -41,7 +41,20 @@
         <p id="empty-food" class="empty-state" hidden>Nothing here yet.</p>
         <button type="button" class="add-item-btn" data-category="food">+ Add item</button>
       </section>
+
+      <!-- House view -->
+      <section id="view-house" class="view" aria-label="House" hidden>
+        <ul id="list-house" class="item-list" aria-live="polite"></ul>
+        <p id="empty-house" class="empty-state" hidden>Nothing here yet.</p>
+        <button type="button" class="add-item-btn" data-category="house">+ Add item</button>
+      </section>
     </main>
+  </div>
+
+  <!-- Undo bar (appears briefly after a swipe-to-delete) -->
+  <div id="undo-bar" class="undo-bar" hidden>
+    <span id="undo-label">Deleted</span>
+    <button id="undo-btn" class="undo-btn" type="button">Undo</button>
   </div>
 
   <!-- Bottom tab navigation -->
@@ -53,6 +66,10 @@
     <button class="tab" type="button" data-view="food">
       <span class="tab-icon" aria-hidden="true">🥫</span>
       <span>Food</span>
+    </button>
+    <button class="tab" type="button" data-view="house">
+      <span class="tab-icon" aria-hidden="true">🏠</span>
+      <span>House</span>
     </button>
   </nav>
 
@@ -86,9 +103,14 @@
         <input id="rename-input" name="name" type="text" autocomplete="off" required />
         <label for="rename-notes-input">Where is it? (optional)</label>
         <input id="rename-notes-input" name="notes" type="text" autocomplete="off" placeholder="e.g. hall closet, top shelf" />
-        <div class="modal-actions">
-          <button type="button" class="btn btn-ghost" data-rename-close>Cancel</button>
-          <button type="submit" class="btn btn-primary">Save</button>
+        <label for="rename-category-input">Category</label>
+        <select id="rename-category-input" name="category"></select>
+        <div class="modal-actions modal-actions-split">
+          <button type="button" id="rename-delete-btn" class="btn btn-danger">Delete item</button>
+          <div class="modal-actions-right">
+            <button type="button" class="btn btn-ghost" data-rename-close>Cancel</button>
+            <button type="submit" class="btn btn-primary">Save</button>
+          </div>
         </div>
       </form>
     </div>
@@ -97,6 +119,6 @@
   <!-- Supabase client (no build step) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
