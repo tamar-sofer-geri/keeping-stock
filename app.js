@@ -229,6 +229,13 @@
         const countSpan = document.createElement('span');
         countSpan.className = 'item-count';
         countSpan.textContent = item.count;
+        if (item.count === 0) {
+          const flag = document.createElement('span');
+          flag.className = 'low-flag';
+          flag.textContent = '❗';
+          flag.setAttribute('aria-hidden', 'true');
+          countSpan.appendChild(flag);
+        }
 
         const plusBtn = document.createElement('button');
         plusBtn.type = 'button';

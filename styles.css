@@ -144,11 +144,20 @@ html, body {
 .step-btn:disabled:active { transform: none; }
 
 .item-count {
+  position: relative;
   min-width: 26px;
   text-align: center;
   font-size: 16px;
   font-weight: 700;
   color: var(--accent-ink);
+}
+
+.low-flag {
+  position: absolute;
+  top: -9px;
+  right: -11px;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .item-delete {
