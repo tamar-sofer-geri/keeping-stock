@@ -36,6 +36,21 @@
     return 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
   }
 
+  function stepUp(count) {
+    if (count < 1) return Math.min(1, count + 0.5);
+    return count + 1;
+  }
+
+  function stepDown(count) {
+    if (count <= 0) return 0;
+    if (count <= 1) return Math.max(0, count - 0.5);
+    return count - 1;
+  }
+
+  function formatCount(count) {
+    return count === 0.5 ? '½' : String(count);
+  }
+
   function showSyncNote(text) {
     syncNote.textContent = text;
     syncNote.hidden = false;
@@ -112,7 +127,9 @@
   async function addItem(category, name, count) {
     name = name.trim();
     if (!name) return;
-    count = Math.max(0, Math.floor(Number(count)) || 0);
+    count = Number(count);
+    if (!Number.isFinite(count) || count < 0) count = 0;
+    count = Math.round(count * 2) / 2;
 
     const existing = items.find(
       (it) => it.category === category && it.name.toLowerCase() === name.toLowerCase()
@@ -347,18 +364,18 @@
         minusBtn.textContent = '−';
         minusBtn.setAttribute('aria-label', `Remove one ${item.name}`);
         minusBtn.disabled = item.count <= 0;
-        minusBtn.addEventListener('click', () => setCount(item.id, item.count - 1));
+        minusBtn.addEventListener('click', () => setCount(item.id, stepDown(item.count)));
 
         const countSpan = document.createElement('span');
         countSpan.className = 'item-count';
-        countSpan.textContent = item.count;
+        countSpan.textContent = formatCount(item.count);
 
         const plusBtn = document.createElement('button');
         plusBtn.type = 'button';
         plusBtn.className = 'step-btn plus';
         plusBtn.textContent = '+';
         plusBtn.setAttribute('aria-label', `Add one ${item.name}`);
-        plusBtn.addEventListener('click', () => setCount(item.id, item.count + 1));
+        plusBtn.addEventListener('click', () => setCount(item.id, stepUp(item.count)));
 
         controls.append(minusBtn, countSpan, plusBtn);
         row.append(info, controls);

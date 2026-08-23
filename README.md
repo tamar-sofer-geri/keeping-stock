@@ -8,7 +8,7 @@ Three pages, switched via the bottom tab bar, each with its own accent color:
 - **Food** (purple)
 - **House** (green)
 
-Each item shows its current count with **−** / **+** buttons to adjust it (the **−** button disables at 0 — counts never go negative), plus a red **❗** next to the name whenever it hits 0. Tap an item's name to open **Edit item**, where you can rename it, set an optional **"Where is it?"** note (e.g. "hall closet, top shelf") shown as a small line under the name, move it to a different category, or delete it. Swipe a row to the right to delete it directly from the list — a brief **Undo** snackbar lets you reverse it for a few seconds. Use **+ Add item** at the bottom of a list to add something new — if the name already exists in that list (case-insensitive), the quantity you enter is just added to its existing count instead of creating a duplicate row.
+Each item shows its current count with **−** / **+** buttons to adjust it (the **−** button disables at 0 — counts never go negative). Between 0 and 1 the steppers pass through **½** — e.g. 1 → ½ → 0 — everywhere else they step by whole numbers. A red **❗** appears next to the name whenever it hits 0. Tap an item's name to open **Edit item**, where you can rename it, set an optional **"Where is it?"** note (e.g. "hall closet, top shelf") shown as a small line under the name, move it to a different category, or delete it. Swipe a row to the right to delete it directly from the list — a brief **Undo** snackbar lets you reverse it for a few seconds. Use **+ Add item** at the bottom of a list to add something new — if the name already exists in that list (case-insensitive), the quantity you enter is just added to its existing count instead of creating a duplicate row.
 
 ## Starting items
 
@@ -40,7 +40,7 @@ create table if not exists public.items (
   id uuid primary key default gen_random_uuid(),
   category text not null check (category in ('toiletries', 'food', 'house')),
   name text not null,
-  count integer not null default 0,
+  count numeric not null default 0,
   notes text not null default '',
   created_at timestamptz not null default now()
 );
@@ -60,6 +60,11 @@ Then paste the project's URL and anon key into `config.js`. The app will seed th
 > alter table public.items add constraint items_category_check check (category in ('toiletries', 'food', 'house'));
 > ```
 > (If Postgres named your constraint something other than the default, find its real name first with `select conname from pg_constraint where conrelid = 'public.items'::regclass and contype = 'c';` and drop that instead.)
+
+> **Migrating for half-quantities:** if your `items` table's `count` column was created as `integer`, widen it so it can hold `0.5`:
+> ```sql
+> alter table public.items alter column count type numeric using count::numeric;
+> ```
 
 > Access is currently **open** (anyone with the app can read/write). To lock it down later, tighten these policies or add Supabase Auth.
 
