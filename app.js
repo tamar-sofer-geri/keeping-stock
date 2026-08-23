@@ -338,7 +338,7 @@
         nameSpan.textContent = item.name;
         nameRow.appendChild(nameSpan);
 
-        if (item.count === 0) {
+        if (item.count <= 0.5) {
           const flag = document.createElement('span');
           flag.className = 'low-flag';
           flag.textContent = '❗';
