@@ -64,6 +64,26 @@ html, body {
 .brand-title-thin { font-weight: 400; color: var(--muted); }
 .brand-title-bold { font-weight: 800; color: var(--accent-ink); }
 
+.header-add-btn {
+  flex: 0 0 auto;
+  margin-left: auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-strong);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+}
+.header-add-btn:active { transform: scale(0.92); }
+
 .sync-note {
   text-align: center;
   color: var(--muted);

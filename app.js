@@ -404,18 +404,26 @@
   const addForm = document.getElementById('add-form');
   const nameInput = document.getElementById('name-input');
   const countInput = document.getElementById('count-input');
+  const headerAddBtn = document.getElementById('header-add-btn');
   let addCategory = 'toiletries';
 
+  function openAddModal(category) {
+    addCategory = category;
+    document.getElementById('modal-title').textContent =
+      `Add item to ${CATEGORY_LABELS[addCategory]}`;
+    nameInput.value = '';
+    countInput.value = '1';
+    addModal.hidden = false;
+    nameInput.focus();
+  }
+
   document.querySelectorAll('.add-item-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      addCategory = btn.dataset.category;
-      document.getElementById('modal-title').textContent =
-        `Add item to ${CATEGORY_LABELS[addCategory]}`;
-      nameInput.value = '';
-      countInput.value = '1';
-      addModal.hidden = false;
-      nameInput.focus();
-    });
+    btn.addEventListener('click', () => openAddModal(btn.dataset.category));
+  });
+
+  headerAddBtn.addEventListener('click', () => {
+    const activeTab = document.querySelector('.tab.is-active');
+    openAddModal(activeTab.dataset.view);
   });
 
   addForm.addEventListener('submit', async (e) => {
