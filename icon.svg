@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="32 41 336 390">
+  <rect x="32" y="41" width="336" height="390" fill="#f1ecfb"/>
   <g transform="translate(200,140)">
     <!-- back box: ghost/white -->
     <g transform="translate(0,-10)">
