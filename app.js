@@ -387,15 +387,18 @@
   }
 
   // ---------- Tabs ----------
+  function switchTab(view) {
+    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('is-active', t.dataset.view === view));
+    document.querySelectorAll('.view').forEach((v) => {
+      v.hidden = v.id !== `view-${view}`;
+    });
+    document.body.classList.remove(...CATEGORIES.map((c) => `theme-${c}`));
+    document.body.classList.add(`theme-${view}`);
+  }
+
   document.querySelectorAll('.tab').forEach((tab) => {
     tab.addEventListener('click', () => {
-      const view = tab.dataset.view;
-      document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('is-active', t === tab));
-      document.querySelectorAll('.view').forEach((v) => {
-        v.hidden = v.id !== `view-${view}`;
-      });
-      document.body.classList.remove(...CATEGORIES.map((c) => `theme-${c}`));
-      document.body.classList.add(`theme-${view}`);
+      switchTab(tab.dataset.view);
     });
   });
 
@@ -482,6 +485,32 @@
   renameModal.querySelectorAll('[data-rename-close]').forEach((el) =>
     el.addEventListener('click', () => { renameModal.hidden = true; })
   );
+
+  // ---------- Back-gesture guard (Android) ----------
+  // A page with no browser-history entries makes Android's back button/edge-swipe
+  // close the app outright instead of doing anything in-page. Keeping one extra
+  // history entry armed means that gesture always lands on us as a popstate
+  // event instead — closing an open modal first, or returning to Toiletries.
+
+  const BACK_DEFAULT_VIEW = 'toiletries';
+
+  function closeAnyOpenModal() {
+    if (!addModal.hidden) { addModal.hidden = true; return true; }
+    if (!renameModal.hidden) { renameModal.hidden = true; return true; }
+    return false;
+  }
+
+  function armBackGuard() {
+    try { history.pushState({ stockGuard: true }, ''); } catch (e) { /* ignore */ }
+  }
+
+  window.addEventListener('popstate', () => {
+    const activeTab = document.querySelector('.tab.is-active');
+    if (!closeAnyOpenModal() && activeTab && activeTab.dataset.view !== BACK_DEFAULT_VIEW) switchTab(BACK_DEFAULT_VIEW);
+    armBackGuard();
+  });
+
+  armBackGuard();
 
   init();
 })();
