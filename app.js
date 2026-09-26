@@ -387,6 +387,7 @@
   }
 
   // ---------- Tabs ----------
+  const TAB_KEY = 'keeping-stock-tab';
   function switchTab(view) {
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('is-active', t.dataset.view === view));
     document.querySelectorAll('.view').forEach((v) => {
@@ -394,6 +395,7 @@
     });
     document.body.classList.remove(...CATEGORIES.map((c) => `theme-${c}`));
     document.body.classList.add(`theme-${view}`);
+    try { sessionStorage.setItem(TAB_KEY, view); } catch (e) { /* storage blocked — tab just won't survive a refresh */ }
   }
 
   document.querySelectorAll('.tab').forEach((tab) => {
@@ -401,6 +403,14 @@
       switchTab(tab.dataset.view);
     });
   });
+
+  // Pull-to-refresh reloads the page, which would otherwise dump you back on
+  // the first tab. sessionStorage (not localStorage) survives a reload but not
+  // closing the app, so a fresh launch still starts on the default tab.
+  try {
+    const savedTab = sessionStorage.getItem(TAB_KEY);
+    if (savedTab && document.getElementById(`view-${savedTab}`)) switchTab(savedTab);
+  } catch (e) { /* storage blocked — start on the default tab */ }
 
   // ---------- Add-item modal ----------
   const addModal = document.getElementById('add-modal');
