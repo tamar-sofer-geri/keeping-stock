@@ -10,6 +10,10 @@ Three pages, switched via the bottom tab bar, each with its own accent color:
 
 Each item shows its current count with **−** / **+** buttons to adjust it (the **−** button disables at 0 — counts never go negative). Between 0 and 1 the steppers pass through **½** — e.g. 1 → ½ → 0 — everywhere else they step by whole numbers. A red **❗** appears next to the name at ½ or 0. Tap an item's name to open **Edit item**, where you can rename it, set an optional **"Where is it?"** note (e.g. "hall closet, top shelf") shown as a small line under the name, move it to a different category, or delete it. Swipe a row to the right to delete it directly from the list — a brief **Undo** snackbar lets you reverse it for a few seconds. Use **+ Add item** at the bottom of a list to add something new — if the name already exists in that list (case-insensitive), the quantity you enter is just added to its existing count instead of creating a duplicate row.
 
+## Moving to a new phone (Backup & restore)
+
+In local-only mode your list lives in the browser on that one device, so a new phone starts with just the starting items. To carry your list over, open **Backup & restore** (the small link at the bottom of the page) on the old phone and tap **Copy** (or **Share…**), send that text to yourself, then on the new phone open **Backup & restore**, paste it under **Restore from a backup**, and tap **Restore**. Restore replaces what's on that device. (If you turn on Supabase sync below, your list lives in the cloud and none of this is needed.)
+
 ## Starting items
 
 **Toiletries:** Aquafresh (10), Tom's of Maine (1), Negev's toothpaste (3), Necca 7 (44), Toilet paper (1), Noam's deodorant (7), Tamar's deodorant (8)

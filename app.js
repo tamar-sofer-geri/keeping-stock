@@ -496,6 +496,111 @@
     el.addEventListener('click', () => { renameModal.hidden = true; })
   );
 
+  // ---------- Backup & restore ----------
+  // Local-only mode keeps everything in this browser's storage, so a new phone
+  // starts empty. Backup produces a block of text that can be pasted into
+  // Restore on another device.
+  const backupBtn = document.getElementById('backup-btn');
+  const backupModal = document.getElementById('backup-modal');
+  const backupExport = document.getElementById('backup-export');
+  const backupImport = document.getElementById('backup-import');
+  const backupCopyBtn = document.getElementById('backup-copy-btn');
+  const backupShareBtn = document.getElementById('backup-share-btn');
+  const backupRestoreBtn = document.getElementById('backup-restore-btn');
+  const backupRestoreSection = document.getElementById('backup-restore-section');
+  const backupStatus = document.getElementById('backup-status');
+
+  function setBackupStatus(message, isError) {
+    backupStatus.textContent = message;
+    backupStatus.classList.toggle('is-error', !!isError);
+  }
+
+  function buildBackup() {
+    return JSON.stringify({
+      app: 'keeping-stock',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      items: items.map(({ category, name, count, notes }) => ({ category, name, count, notes: notes || '' })),
+    });
+  }
+
+  function parseBackup(text) {
+    const notABackup = { error: "That doesn't look like a Keeping Stock backup." };
+    let data;
+    try { data = JSON.parse(text); } catch (e) { return notABackup; }
+    const list = Array.isArray(data) ? data : data && data.items;
+    if (!Array.isArray(list)) return notABackup;
+
+    const seen = new Set();
+    const parsed = [];
+    let skipped = 0;
+    list.forEach((raw) => {
+      const name = raw && typeof raw.name === 'string' ? raw.name.trim() : '';
+      const count = Number(raw && raw.count);
+      if (!name || !CATEGORIES.includes(raw.category) || !Number.isFinite(count)) { skipped++; return; }
+      const key = `${raw.category}|${name.toLowerCase()}`;
+      if (seen.has(key)) { skipped++; return; }
+      seen.add(key);
+      parsed.push({
+        category: raw.category,
+        name,
+        count: Math.round(Math.max(0, count) * 2) / 2,
+        notes: typeof raw.notes === 'string' ? raw.notes.trim() : '',
+      });
+    });
+    if (!parsed.length) return { error: 'No items found in that backup.' };
+    return { items: parsed, skipped };
+  }
+
+  function openBackupModal() {
+    backupExport.value = buildBackup();
+    backupImport.value = '';
+    setBackupStatus('');
+    backupRestoreSection.hidden = useSupabase;
+    backupShareBtn.hidden = !navigator.share;
+    backupModal.hidden = false;
+  }
+
+  async function copyBackup() {
+    try {
+      await navigator.clipboard.writeText(backupExport.value);
+    } catch (e) {
+      backupExport.focus();
+      backupExport.select();
+      if (!(document.execCommand && document.execCommand('copy'))) {
+        setBackupStatus('Press and hold the text above to copy it.', true);
+        return;
+      }
+    }
+    setBackupStatus('Copied! Paste it somewhere you can reach from your other phone.');
+  }
+
+  function restoreBackup() {
+    const result = parseBackup(backupImport.value.trim());
+    if (result.error) { setBackupStatus(result.error, true); return; }
+    if (!confirm(`Replace everything on this device with the ${result.items.length} items in this backup?`)) return;
+    finalizePendingDelete();
+    items = result.items.map((it) => ({ id: uid(), ...it }));
+    localSave(items);
+    render();
+    backupImport.value = '';
+    backupExport.value = buildBackup();
+    const n = result.items.length;
+    setBackupStatus(`Restored ${n} ${n === 1 ? 'item' : 'items'}.` + (result.skipped ? ` (${result.skipped} skipped.)` : ''));
+  }
+
+  backupBtn.addEventListener('click', openBackupModal);
+  backupCopyBtn.addEventListener('click', copyBackup);
+  backupRestoreBtn.addEventListener('click', restoreBackup);
+  backupShareBtn.addEventListener('click', async () => {
+    try {
+      await navigator.share({ title: 'Keeping Stock backup', text: backupExport.value });
+    } catch (e) { /* share sheet dismissed */ }
+  });
+  backupModal.querySelectorAll('[data-backup-close]').forEach((el) =>
+    el.addEventListener('click', () => { backupModal.hidden = true; })
+  );
+
   // ---------- Back-gesture guard (Android) ----------
   // A page with no browser-history entries makes Android's back button/edge-swipe
   // close the app outright instead of doing anything in-page. Keeping one extra
@@ -507,6 +612,7 @@
   function closeAnyOpenModal() {
     if (!addModal.hidden) { addModal.hidden = true; return true; }
     if (!renameModal.hidden) { renameModal.hidden = true; return true; }
+    if (!backupModal.hidden) { backupModal.hidden = true; return true; }
     return false;
   }
 

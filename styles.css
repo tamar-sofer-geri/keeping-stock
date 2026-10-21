@@ -302,6 +302,8 @@ html, body {
   padding: 22px;
   width: 100%;
   max-width: 360px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   box-shadow: 0 12px 40px rgba(20, 60, 45, 0.28);
 }
 .modal-card h2 {
@@ -317,7 +319,8 @@ html, body {
 }
 .modal-card label:first-of-type { margin-top: 0; }
 .modal-card input,
-.modal-card select {
+.modal-card select,
+.modal-card textarea {
   width: 100%;
   padding: 12px;
   font-size: 16px;
@@ -329,7 +332,28 @@ html, body {
   color: var(--ink);
 }
 .modal-card input:focus,
-.modal-card select:focus { border-color: var(--accent-strong); }
+.modal-card select:focus,
+.modal-card textarea:focus { border-color: var(--accent-strong); }
+.modal-card textarea { resize: vertical; }
+
+/* Backup & restore */
+.backup-link {
+  display: block;
+  margin: 18px auto 0;
+  padding: 6px 10px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.backup-help { margin: 0 0 14px; font-size: 14px; color: var(--muted); }
+.backup-text { font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+.backup-actions { display: flex; gap: 8px; margin-top: 10px; }
+#backup-restore-section { margin-top: 20px; }
+.backup-status { min-height: 1.2em; margin: 12px 0 0; font-size: 13px; color: var(--accent-ink); }
+.backup-status.is-error { color: var(--danger); }
 
 .modal-actions {
   display: flex;
