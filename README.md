@@ -41,7 +41,36 @@ Why a map on the family document instead of a subcollection of per-item document
 - The Firebase SDK version in `index.html` (10.14.1) matches Showtime's on purpose: both apps live on the same GitHub Pages origin and so share the same browser-side Firestore cache.
 - Showtime's family codes also work here (and vice versa a Keeping Stock code just shows an empty Showtime list), since both use `families/{code}`.
 
-> **Privacy caveat:** the project's rules currently let any signed-in client *list* the family documents, so a code is a convenience, not a lock — anyone who goes digging in the (public) app code could read the lists. Fine for toothpaste counts; worth tightening (`allow get` but not `list` on `/families/{code}`) since Showtime's tickets sit in the same place.
+### Security rules (live in the Firebase console, shared with Showtime)
+
+A shared list is protected by an unguessable 8-character code, like an unlisted link: a signed-in client can look a family up *by its code* but cannot browse the list of families or the folders of files. These rules are not stored in any repo, so here is what is currently published (Firebase console → Firestore Database → Rules, and Storage → Rules):
+
+```
+// Firestore
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /families/{familyCode} {
+      allow get, write: if request.auth != null;
+      match /tickets/{ticketId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+  }
+}
+
+// Storage
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /families/{familyCode}/{allPaths=**} {
+      allow get, write: if request.auth != null;
+    }
+  }
+}
+```
+
+(Before 2026-11-07 these said `allow read, write`, which also allowed *listing* every family — and every family's files — to anyone signed in. Changing `read` to `get` closed that. A shared list still isn't private from anyone who is given or guesses the code.)
 
 ## Run locally
 
