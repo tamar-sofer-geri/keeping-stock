@@ -22,8 +22,6 @@
   ];
 
   const config = window.HOMESTOCK_CONFIG || {};
-  const useSupabase = !!(config.supabaseUrl && config.supabaseAnonKey);
-  let supabase = null;
   let items = [];
 
   const syncNote = document.getElementById('sync-note');
@@ -56,6 +54,10 @@
     syncNote.hidden = false;
   }
 
+  function hideSyncNote() {
+    syncNote.hidden = true;
+  }
+
   // ---------- Backend: local storage ----------
   function localLoad() {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -74,57 +76,181 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
   }
 
-  // ---------- Backend: supabase ----------
-  async function refetchFromSupabase() {
-    const { data, error } = await supabase.from('items').select('*').order('name', { ascending: true });
-    if (error) throw error;
-    if (!data.length) {
-      const { error: insErr } = await supabase.from('items').insert(SEED_ITEMS);
-      if (insErr) throw insErr;
-      const again = await supabase.from('items').select('*').order('name', { ascending: true });
-      if (again.error) throw again.error;
-      items = again.data;
-    } else {
-      items = data;
-    }
+  // ---------- Backend: shared list (Firebase) ----------
+  // Two modes. "local" (the default): the list lives in this browser's
+  // localStorage and nothing leaves the phone. "cloud": the list lives in one
+  // Firestore document, families/{code}, in the same Firebase project Showtime
+  // uses, so every phone with the code sees the same items.
+  //
+  // Items are a map on that document (stock.<itemId> = {category, name, count,
+  // notes}) rather than a subcollection: the project's security rules only open
+  // `tickets` beneath a family, while a field on the family document itself
+  // needs no rule changes. Field-level merges touch a single item, so two
+  // phones editing different items never overwrite each other.
+  const FAMILY_KEY = 'keeping-stock-family-code';
+  const CLOUD_CACHE_KEY = 'keeping-stock-cloud-cache';
+  // No 0/O or 1/I/L — codes get typed by hand on a phone keyboard.
+  const FAMILY_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const NETWORK_TIMEOUT_MS = 15000;
+  const OFFLINE_MESSAGE = 'Could not reach the server — check your connection.';
+
+  let familyCode = null;
+  try { familyCode = localStorage.getItem(FAMILY_KEY); } catch (e) { /* storage blocked — stays local */ }
+
+  let firestoreDb = null;
+  let authReady = null;
+  let unsubscribeFamily = null;
+
+  const isCloud = () => !!familyCode;
+
+  function generateFamilyCode() {
+    const bytes = crypto.getRandomValues(new Uint8Array(8));
+    return [...bytes].map((b) => FAMILY_CODE_ALPHABET[b % FAMILY_CODE_ALPHABET.length]).join('');
   }
 
-  function subscribeRealtime() {
-    supabase
-      .channel('items-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, async () => {
-        try {
-          const { data, error } = await supabase.from('items').select('*').order('name', { ascending: true });
-          if (error) throw error;
-          items = data;
+  function withTimeout(promise, message) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error(message)), NETWORK_TIMEOUT_MS)),
+    ]);
+  }
+
+  function ensureFirebase() {
+    if (typeof firebase === 'undefined' || !config.firebase) {
+      return Promise.reject(new Error('Sharing is unavailable right now (Firebase did not load).'));
+    }
+    if (!firestoreDb) {
+      firebase.initializeApp(config.firebase);
+      firestoreDb = firebase.firestore();
+      firestoreDb.enablePersistence({ synchronizeTabs: true }).catch(() => {
+        // Another tab holds the offline cache, or the browser can't — syncing still works.
+      });
+    }
+    if (!authReady) {
+      authReady = new Promise((resolve, reject) => {
+        firebase.auth().onAuthStateChanged((user) => { if (user) resolve(user); });
+        firebase.auth().signInAnonymously().catch((err) => { authReady = null; reject(err); });
+      });
+    }
+    return authReady;
+  }
+
+  const familyRef = (code) => firestoreDb.collection('families').doc(code);
+
+  function itemsFromSnapshot(snap) {
+    const stock = (snap.exists && snap.data().stock) || {};
+    return Object.keys(stock)
+      .filter((id) => stock[id] && typeof stock[id] === 'object')
+      .map((id) => ({
+        id,
+        category: stock[id].category,
+        name: stock[id].name,
+        count: Number(stock[id].count) || 0,
+        notes: stock[id].notes || '',
+      }))
+      .filter((it) => CATEGORIES.includes(it.category) && typeof it.name === 'string' && it.name);
+  }
+
+  // Last list seen from the cloud, so the app paints instantly on launch (and
+  // offline) instead of flashing an empty list while the first sync arrives.
+  function readCloudCache() {
+    try { return JSON.parse(localStorage.getItem(CLOUD_CACHE_KEY)) || []; } catch (e) { return []; }
+  }
+  function writeCloudCache(list) {
+    try { localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify(list)); } catch (e) { /* storage blocked/full */ }
+  }
+
+  function stopCloud() {
+    if (unsubscribeFamily) { unsubscribeFamily(); unsubscribeFamily = null; }
+  }
+
+  function startCloud() {
+    stopCloud();
+    if (!items.length) showSyncNote('Loading the shared list…');
+    const unreachable = (err) => {
+      console.error(err);
+      showSyncNote("Can't reach the shared list right now — showing the last copy on this phone.");
+    };
+    ensureFirebase()
+      .then(() => {
+        unsubscribeFamily = familyRef(familyCode).onSnapshot((snap) => {
+          hideSyncNote();
+          items = itemsFromSnapshot(snap);
+          // A swiped-away item stays hidden until its undo window closes.
+          if (pendingDelete) items = items.filter((it) => it.id !== pendingDelete.item.id);
+          writeCloudCache(items);
           render();
-        } catch (err) {
-          console.error(err);
-        }
+        }, unreachable);
       })
-      .subscribe();
+      .catch(unreachable);
+  }
+
+  function reportSyncError(err) {
+    console.error(err);
+    showSyncNote("Couldn't save to the shared list — check your connection.");
+  }
+
+  // Writes are deliberately not awaited by the UI: offline, Firestore queues
+  // them and finishes once the connection is back, so waiting would freeze
+  // the screen. The `code` is captured now in case the phone leaves the list
+  // before the write goes out.
+  function cloudSaveFields(id, fields) {
+    const code = familyCode;
+    ensureFirebase()
+      .then(() => familyRef(code).set({ stock: { [id]: fields } }, { merge: true }))
+      .catch(reportSyncError);
+  }
+
+  function cloudRemove(id) {
+    const code = familyCode;
+    ensureFirebase()
+      .then(() => familyRef(code).set({ stock: { [id]: firebase.firestore.FieldValue.delete() } }, { merge: true }))
+      .catch(reportSyncError);
+  }
+
+  function stockMap(list) {
+    const stock = {};
+    list.forEach((it) => {
+      stock[it.id] = { category: it.category, name: it.name, count: it.count, notes: it.notes || '' };
+    });
+    return stock;
+  }
+
+  // Replace the whole shared list in one write (used by Restore).
+  function cloudReplaceAll(list) {
+    const code = familyCode;
+    ensureFirebase()
+      .then(() => familyRef(code).update({ stock: stockMap(list) }))
+      .catch(reportSyncError);
   }
 
   // ---------- Init ----------
-  async function init() {
-    if (useSupabase) {
-      supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
-      try {
-        await refetchFromSupabase();
-        subscribeRealtime();
-      } catch (err) {
-        console.error('Supabase init failed, falling back to local storage', err);
-        showSyncNote('Could not connect — using this device only.');
-        items = localLoad();
-      }
+  function init() {
+    if (isCloud()) {
+      items = readCloudCache();
+      render();
+      startCloud();
     } else {
       items = localLoad();
+      render();
     }
-    render();
+    renderSyncState();
   }
 
   // ---------- Mutations ----------
-  async function addItem(category, name, count) {
+  // Each change updates the screen immediately, then saves: to this phone's
+  // storage in local mode, or merged into the shared document in cloud mode.
+  function persistFields(item, fields) {
+    if (isCloud()) cloudSaveFields(item.id, fields);
+    else localSave(items);
+  }
+
+  function persistRemove(id) {
+    if (isCloud()) cloudRemove(id);
+    else localSave(items);
+  }
+
+  function addItem(category, name, count) {
     name = name.trim();
     if (!name) return;
     count = Number(count);
@@ -135,40 +261,26 @@
       (it) => it.category === category && it.name.toLowerCase() === name.toLowerCase()
     );
     if (existing) {
-      await setCount(existing.id, existing.count + count);
+      setCount(existing.id, existing.count + count);
       return;
     }
 
-    if (useSupabase) {
-      const { data, error } = await supabase
-        .from('items')
-        .insert({ category, name, count, notes: '' })
-        .select()
-        .single();
-      if (error) { console.error(error); return; }
-      items.push(data);
-    } else {
-      items.push({ id: uid(), category, name, count, notes: '' });
-      localSave(items);
-    }
+    const item = { id: uid(), category, name, count, notes: '' };
+    items.push(item);
     render();
+    persistFields(item, { category, name, count, notes: '' });
   }
 
-  async function setCount(id, count) {
+  function setCount(id, count) {
     count = Math.max(0, count);
     const item = items.find((it) => it.id === id);
     if (!item) return;
     item.count = count;
     render();
-    if (useSupabase) {
-      const { error } = await supabase.from('items').update({ count }).eq('id', id);
-      if (error) console.error(error);
-    } else {
-      localSave(items);
-    }
+    persistFields(item, { count });
   }
 
-  async function updateItemDetails(id, name, notes, category) {
+  function updateItemDetails(id, name, notes, category) {
     name = name.trim();
     notes = notes.trim();
     if (!name) return;
@@ -185,22 +297,12 @@
     item.notes = notes;
     item.category = category;
     render();
-    if (useSupabase) {
-      const { error } = await supabase.from('items').update({ name, notes, category }).eq('id', id);
-      if (error) console.error(error);
-    } else {
-      localSave(items);
-    }
+    persistFields(item, { name, notes, category });
   }
 
-  async function deleteItem(id) {
+  function deleteItem(id) {
     items = items.filter((it) => it.id !== id);
-    if (useSupabase) {
-      const { error } = await supabase.from('items').delete().eq('id', id);
-      if (error) console.error(error);
-    } else {
-      localSave(items);
-    }
+    persistRemove(id);
   }
 
   // ---------- Swipe-to-delete with undo ----------
@@ -556,7 +658,6 @@
     backupExport.value = buildBackup();
     backupImport.value = '';
     setBackupStatus('');
-    backupRestoreSection.hidden = useSupabase;
     backupShareBtn.hidden = !navigator.share;
     backupModal.hidden = false;
   }
@@ -578,10 +679,12 @@
   function restoreBackup() {
     const result = parseBackup(backupImport.value.trim());
     if (result.error) { setBackupStatus(result.error, true); return; }
-    if (!confirm(`Replace everything on this device with the ${result.items.length} items in this backup?`)) return;
+    const where = isCloud() ? 'the shared list (everyone using it will see this)' : 'this device';
+    if (!confirm(`Replace everything on ${where} with the ${result.items.length} items in this backup?`)) return;
     finalizePendingDelete();
     items = result.items.map((it) => ({ id: uid(), ...it }));
-    localSave(items);
+    if (isCloud()) cloudReplaceAll(items);
+    else localSave(items);
     render();
     backupImport.value = '';
     backupExport.value = buildBackup();
@@ -601,6 +704,153 @@
     el.addEventListener('click', () => { backupModal.hidden = true; })
   );
 
+  // ---------- Share this list (create / join / leave) ----------
+  const syncBtn = document.getElementById('sync-btn');
+  const syncModal = document.getElementById('sync-modal');
+  const syncLocalView = document.getElementById('sync-local-view');
+  const syncCloudView = document.getElementById('sync-cloud-view');
+  const syncCodeInput = document.getElementById('sync-code-input');
+  const syncCodeDisplay = document.getElementById('sync-code-display');
+  const syncStatus = document.getElementById('sync-status');
+  const syncCreateBtn = document.getElementById('sync-create-btn');
+  const syncJoinBtn = document.getElementById('sync-join-btn');
+  const syncInviteBtn = document.getElementById('sync-invite-btn');
+  const syncCopyBtn = document.getElementById('sync-copy-btn');
+  const syncLeaveBtn = document.getElementById('sync-leave-btn');
+
+  function setSyncStatus(message, isError) {
+    syncStatus.textContent = message;
+    syncStatus.classList.toggle('is-error', !!isError);
+  }
+
+  function renderSyncState() {
+    const cloud = isCloud();
+    syncBtn.classList.toggle('is-shared', cloud);
+    syncBtn.setAttribute('aria-label', cloud ? 'Shared list settings' : 'Share this list');
+    syncLocalView.hidden = cloud;
+    syncCloudView.hidden = !cloud;
+    syncCodeDisplay.textContent = familyCode || '';
+  }
+
+  function openSyncModal() {
+    setSyncStatus('');
+    renderSyncState();
+    syncModal.hidden = false;
+  }
+
+  // Switch this phone to a shared list. The local list in storage is left
+  // untouched, so it still serves as a backup copy.
+  function adoptFamily(code, keepItems) {
+    familyCode = code;
+    try {
+      localStorage.setItem(FAMILY_KEY, code);
+      localStorage.removeItem(CLOUD_CACHE_KEY);
+    } catch (e) { /* storage blocked — works until the page is closed */ }
+    if (!keepItems) items = [];
+    render();
+    startCloud();
+    renderSyncState();
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      const box = document.createElement('textarea');
+      box.value = text;
+      box.style.cssText = 'position:fixed;opacity:0;';
+      document.body.appendChild(box);
+      box.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (err) { /* ignore */ }
+      box.remove();
+      return ok;
+    }
+  }
+
+  async function createFamily() {
+    syncCreateBtn.disabled = true;
+    setSyncStatus('Creating your shared list…');
+    try {
+      await withTimeout(ensureFirebase(), OFFLINE_MESSAGE);
+      finalizePendingDelete();
+      const code = generateFamilyCode();
+      await withTimeout(familyRef(code).set({
+        app: 'keeping-stock',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        stock: stockMap(items),
+      }), OFFLINE_MESSAGE);
+      adoptFamily(code, true);
+      setSyncStatus('Shared! Tap Invite to send the code to someone.');
+    } catch (err) {
+      console.error(err);
+      setSyncStatus(err && err.message ? err.message : 'Something went wrong. Please try again.', true);
+    } finally {
+      syncCreateBtn.disabled = false;
+    }
+  }
+
+  async function joinFamily() {
+    const code = syncCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length !== 8) { setSyncStatus('Enter the 8-character code.', true); return; }
+    syncJoinBtn.disabled = true;
+    setSyncStatus('Joining…');
+    try {
+      await withTimeout(ensureFirebase(), OFFLINE_MESSAGE);
+      const snap = await withTimeout(familyRef(code).get({ source: 'server' }), OFFLINE_MESSAGE);
+      if (!snap.exists) { setSyncStatus('No shared list found with that code. Check it and try again.', true); return; }
+      finalizePendingDelete();
+      adoptFamily(code, false);
+      syncCodeInput.value = '';
+      setSyncStatus('Joined! The shared list will appear in a moment.');
+    } catch (err) {
+      console.error(err);
+      setSyncStatus(err && err.message ? err.message : 'Something went wrong. Please try again.', true);
+    } finally {
+      syncJoinBtn.disabled = false;
+    }
+  }
+
+  function leaveFamily() {
+    if (!confirm('Stop syncing on this phone? It keeps a copy of the list as it is now, and the shared list stays online for everyone else.')) return;
+    finalizePendingDelete();
+    stopCloud();
+    familyCode = null;
+    try {
+      localStorage.removeItem(FAMILY_KEY);
+      localStorage.removeItem(CLOUD_CACHE_KEY);
+    } catch (e) { /* ignore */ }
+    localSave(items);
+    hideSyncNote();
+    render();
+    renderSyncState();
+    setSyncStatus('This phone is back to its own list.');
+  }
+
+  async function inviteToFamily() {
+    const url = location.origin + location.pathname;
+    const text = `Join my Keeping Stock list! Open ${url}, tap the ☁️ button at the top, and under "Or join one with a code" enter: ${familyCode}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Keeping Stock', text }); } catch (e) { /* share sheet dismissed */ }
+    } else {
+      setSyncStatus((await copyText(text)) ? 'Invitation copied — paste it into a message.' : 'Could not copy — share the code above by hand.', false);
+    }
+  }
+
+  syncBtn.addEventListener('click', openSyncModal);
+  syncCreateBtn.addEventListener('click', createFamily);
+  syncJoinBtn.addEventListener('click', joinFamily);
+  syncInviteBtn.addEventListener('click', inviteToFamily);
+  syncLeaveBtn.addEventListener('click', leaveFamily);
+  syncCopyBtn.addEventListener('click', async () => {
+    setSyncStatus((await copyText(familyCode)) ? 'Code copied.' : 'Could not copy — press and hold the code to copy it.', false);
+  });
+  syncCodeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinFamily(); });
+  syncModal.querySelectorAll('[data-sync-close]').forEach((el) =>
+    el.addEventListener('click', () => { syncModal.hidden = true; })
+  );
+
   // ---------- Back-gesture guard (Android) ----------
   // A page with no browser-history entries makes Android's back button/edge-swipe
   // close the app outright instead of doing anything in-page. Keeping one extra
@@ -613,6 +863,7 @@
     if (!addModal.hidden) { addModal.hidden = true; return true; }
     if (!renameModal.hidden) { renameModal.hidden = true; return true; }
     if (!backupModal.hidden) { backupModal.hidden = true; return true; }
+    if (!syncModal.hidden) { syncModal.hidden = true; return true; }
     return false;
   }
 

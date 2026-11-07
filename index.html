@@ -16,14 +16,17 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=8" />
   <link rel="icon" href="icon.svg?v=7" type="image/svg+xml" />
   <title>Keeping Stock</title>
-  <link rel="stylesheet" href="styles.css?v=13" />
+  <link rel="stylesheet" href="styles.css?v=16" />
 </head>
 <body class="theme-toiletries">
   <div class="app">
     <header class="app-header">
       <img class="brand-logo" src="icon.svg?v=7" alt="" width="44" height="44" />
       <h1 class="brand-title"><span class="brand-title-thin">Keeping</span> <span class="brand-title-bold">Stock</span></h1>
-      <button id="header-add-btn" class="header-add-btn" type="button" aria-label="Add item">+</button>
+      <div class="header-actions">
+        <button id="sync-btn" class="header-icon-btn" type="button" aria-label="Share this list">☁️</button>
+        <button id="header-add-btn" class="header-add-btn" type="button" aria-label="Add item">+</button>
+      </div>
     </header>
 
     <p id="sync-note" class="sync-note" hidden></p>
@@ -145,9 +148,45 @@
     </div>
   </div>
 
-  <!-- Supabase client (no build step) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
-  <script src="app.js?v=15"></script>
+  <!-- Share this list modal -->
+  <div id="sync-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-sync-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="sync-title">
+      <h2 id="sync-title">Share this list</h2>
+
+      <div id="sync-local-view">
+        <p class="backup-help">Right now this list lives <strong>only on this phone</strong>. Create a shared list to keep it safely online and let someone else use it too &mdash; they join with a short code.</p>
+        <button type="button" id="sync-create-btn" class="btn btn-primary">Create shared list</button>
+        <label for="sync-code-input">Or join one with a code</label>
+        <input id="sync-code-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12" placeholder="e.g. K7M2P9QX" />
+        <div class="backup-actions">
+          <button type="button" id="sync-join-btn" class="btn btn-primary">Join</button>
+        </div>
+      </div>
+
+      <div id="sync-cloud-view" hidden>
+        <p class="backup-help">This phone is using the <strong>shared list</strong>. Anyone who joins with this code sees and edits the same items.</p>
+        <label>Shared list code</label>
+        <div id="sync-code-display" class="sync-code"></div>
+        <div class="backup-actions">
+          <button type="button" id="sync-invite-btn" class="btn btn-primary">Invite</button>
+          <button type="button" id="sync-copy-btn" class="btn btn-ghost">Copy code</button>
+        </div>
+        <button type="button" id="sync-leave-btn" class="btn btn-danger sync-leave">Stop syncing on this phone</button>
+      </div>
+
+      <p id="sync-status" class="backup-status" aria-live="polite"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-sync-close>Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase (shared list): Firestore + anonymous sign-in, loaded from Google's CDN; no build step -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="config.js?v=2"></script>
+  <script src="app.js?v=16"></script>
 </body>
 </html>

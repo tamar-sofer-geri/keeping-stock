@@ -1,6 +1,6 @@
 # 📦 Keeping Stock
 
-A mobile-friendly web app to track toiletries and food inventory at home, optionally **synced across devices** in real time via a shared [Supabase](https://supabase.com) database. No build step — plain HTML/CSS/JavaScript, deployable to GitHub Pages.
+A mobile-friendly web app to track toiletries and food inventory at home, optionally **shared and synced across phones** in real time through Firebase (Google's free tier). No build step — plain HTML/CSS/JavaScript, deployable to GitHub Pages.
 
 Three pages, switched via the bottom tab bar, each with its own accent color:
 
@@ -12,7 +12,7 @@ Each item shows its current count with **−** / **+** buttons to adjust it (the
 
 ## Moving to a new phone (Backup & restore)
 
-In local-only mode your list lives in the browser on that one device, so a new phone starts with just the starting items. To carry your list over, open **Backup & restore** (the small link at the bottom of the page) on the old phone and tap **Copy** (or **Share…**), send that text to yourself, then on the new phone open **Backup & restore**, paste it under **Restore from a backup**, and tap **Restore**. Restore replaces what's on that device. (If you turn on Supabase sync below, your list lives in the cloud and none of this is needed.)
+In local-only mode your list lives in the browser on that one device, so a new phone starts with just the starting items. To carry your list over, open **Backup & restore** (the small link at the bottom of the page) on the old phone and tap **Copy** (or **Share…**), send that text to yourself, then on the new phone open **Backup & restore**, paste it under **Restore from a backup**, and tap **Restore**. Restore replaces what's on that device. (If you use a shared list — see below — your list lives in the cloud and none of this is needed.)
 
 ## Starting items
 
@@ -20,57 +20,28 @@ In local-only mode your list lives in the browser on that one device, so a new p
 
 **Food:** BBQ Sauce (6), Olive oil (1), Pine nuts (1), Sugar (1), Flour (1), Paper Towels (2)
 
-These are seeded automatically the first time the app runs — in local-only mode via `localStorage`, or in Supabase mode via the app itself if the `items` table is empty on first load. No manual insert needed.
+These are seeded automatically the first time the app runs on a phone that has no list yet.
 
-## Configuration
+## Sharing a list between phones
 
-Backend connection lives in `config.js`:
+By default the list lives **only in that phone's browser** (local mode). The ☁️ button in the header turns on a **shared list**:
 
-```js
-window.HOMESTOCK_CONFIG = {
-  supabaseUrl: "https://<project>.supabase.co",
-  supabaseAnonKey: "<anon public key>"
-};
-```
+- **Create shared list** uploads this phone's current list and gives you an 8-character code. **Invite** sends the code (and how to use it) through whatever share sheet you pick.
+- On the other phone, tap ☁️ → **Join** and enter the code. Both phones then show the same list, and changes appear on the other phone within moments.
+- **Stop syncing on this phone** returns it to a local list (it keeps a copy of what it was showing); the shared list stays online for everyone else.
+- The ☁️ button is filled in when a phone is using a shared list. **Backup & restore** also works on a shared list (Restore replaces it for everyone).
 
-Leave both blank to run in **local-only mode** (this device only, no sync — the default as shipped).
+### How it's stored
 
-### Database schema
+Firebase (Firestore + Anonymous Auth, loaded from Google's CDN — no build step), in the **same Firebase project as Showtime**. Each shared list is one document, `families/{code}`, with the items as a map on it (`stock.<itemId> = {category, name, count, notes}`). Edits merge a single item at a time, so two phones changing different items never overwrite each other; changing the *same* item at the same moment is last-write-wins.
 
-To enable multi-device sync, create a Supabase project and run this once in its SQL editor:
+Why a map on the family document instead of a subcollection of per-item documents? That project's Firestore security rules only open `tickets` beneath a family, and a field on the family document itself needs no rule changes. If the rules ever allow it, a `stock` subcollection would be the more conventional layout.
 
-```sql
-create table if not exists public.items (
-  id uuid primary key default gen_random_uuid(),
-  category text not null check (category in ('toiletries', 'food', 'house')),
-  name text not null,
-  count numeric not null default 0,
-  notes text not null default '',
-  created_at timestamptz not null default now()
-);
-alter table public.items enable row level security;
-create policy "public read"   on public.items for select using (true);
-create policy "public insert" on public.items for insert with check (true);
-create policy "public update" on public.items for update using (true) with check (true);
-create policy "public delete" on public.items for delete using (true);
-alter publication supabase_realtime add table public.items;
-```
+- `config.js` holds the Firebase web settings (the same public values Showtime uses). They identify the project and are not secrets — access is decided by the Firestore security rules.
+- The Firebase SDK version in `index.html` (10.14.1) matches Showtime's on purpose: both apps live on the same GitHub Pages origin and so share the same browser-side Firestore cache.
+- Showtime's family codes also work here (and vice versa a Keeping Stock code just shows an empty Showtime list), since both use `families/{code}`.
 
-Then paste the project's URL and anon key into `config.js`. The app will seed the starting items into the empty table automatically on first load.
-
-> **Migrating for the House category:** if your `items` table's `category` check constraint was created before House existed, widen it:
-> ```sql
-> alter table public.items drop constraint if exists items_category_check;
-> alter table public.items add constraint items_category_check check (category in ('toiletries', 'food', 'house'));
-> ```
-> (If Postgres named your constraint something other than the default, find its real name first with `select conname from pg_constraint where conrelid = 'public.items'::regclass and contype = 'c';` and drop that instead.)
-
-> **Migrating for half-quantities:** if your `items` table's `count` column was created as `integer`, widen it so it can hold `0.5`:
-> ```sql
-> alter table public.items alter column count type numeric using count::numeric;
-> ```
-
-> Access is currently **open** (anyone with the app can read/write). To lock it down later, tighten these policies or add Supabase Auth.
+> **Privacy caveat:** the project's rules currently let any signed-in client *list* the family documents, so a code is a convenience, not a lock — anyone who goes digging in the (public) app code could read the lists. Fine for toothpaste counts; worth tightening (`allow get` but not `list` on `/families/{code}`) since Showtime's tickets sit in the same place.
 
 ## Run locally
 
@@ -92,6 +63,6 @@ Then open <http://localhost:8000>.
 | --- | --- |
 | `index.html` | Header, three views (Toiletries/Food/House), bottom tab bar, add/edit modals, undo bar |
 | `styles.css` | Per-category color themes, mobile-first styling |
-| `app.js` | Supabase data access, real-time sync, localStorage fallback, rendering, actions |
-| `config.js` | Supabase URL + anon key (blank = local-only mode) |
+| `app.js` | Local storage + Firebase shared-list sync, rendering, actions, backup & restore |
+| `config.js` | Firebase web settings for the shared list |
 | `manifest.webmanifest`, `icon.svg`, `apple-touch-icon.png` | Home-screen install support |

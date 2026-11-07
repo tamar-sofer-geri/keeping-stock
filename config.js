@@ -1,16 +1,18 @@
-/* Supabase connection settings.
+/* Firebase settings for the optional shared list.
  *
- * Paste your project's values below. Both are safe to commit:
- * the anon key is a public client key, and access is governed by the
- * table's Row Level Security policies.
+ * These are the same public client settings Showtime uses (same Firebase
+ * project). They identify the project; they are not secrets. Access is decided
+ * by the project's Firestore security rules, not by hiding this key.
  *
- *   Project Settings -> API -> Project URL       => supabaseUrl
- *   Project Settings -> API -> Project API keys  => anon / public => supabaseAnonKey
- *
- * Leave them blank to run in local-only mode (no cross-device sync) -
- * the app will seed itself with the starting item list on first load.
+ * Keeping Stock only uses Firestore + Anonymous Auth (no Storage), so it works
+ * on the free plan. See README.md for how the shared list is stored.
  */
 window.HOMESTOCK_CONFIG = {
-  supabaseUrl: "",
-  supabaseAnonKey: ""
+  firebase: {
+    apiKey: "AIzaSyC-nCkVIGR5T2Hn6wYkm3sdqeNQFKXS1-c",
+    authDomain: "showtime-family.firebaseapp.com",
+    projectId: "showtime-family",
+    messagingSenderId: "256408852477",
+    appId: "1:256408852477:web:de112bb28da5fcf5fd6b94"
+  }
 };
