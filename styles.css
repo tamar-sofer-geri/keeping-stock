@@ -72,6 +72,7 @@ html, body {
 }
 
 .header-icon-btn {
+  position: relative;
   flex: 0 0 auto;
   width: 40px;
   height: 40px;
@@ -86,9 +87,27 @@ html, body {
   justify-content: center;
 }
 .header-icon-btn:active { transform: scale(0.92); }
-/* Lit up when this phone is using the shared list */
+/* Unmistakable when this phone is using the shared list: solid color + a green check.
+   Not shared = plain white circle with just an outline. */
 .header-icon-btn.is-shared {
-  background: var(--accent);
+  background: var(--accent-strong);
+}
+.header-icon-btn.is-shared::after {
+  content: '✓';
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  box-sizing: border-box;
+  width: 17px;
+  height: 17px;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: #1f9d55;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 13px;
+  text-align: center;
 }
 
 .header-add-btn {

@@ -16,7 +16,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=8" />
   <link rel="icon" href="icon.svg?v=7" type="image/svg+xml" />
   <title>Keeping Stock</title>
-  <link rel="stylesheet" href="styles.css?v=16" />
+  <link rel="stylesheet" href="styles.css?v=17" />
 </head>
 <body class="theme-toiletries">
   <div class="app">
@@ -127,7 +127,7 @@
     <div class="modal-backdrop" data-backup-close></div>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="backup-title">
       <h2 id="backup-title">Backup &amp; restore</h2>
-      <p class="backup-help">Copy your list from this device, then paste it into <strong>Restore</strong> on your other phone.</p>
+      <p id="backup-help" class="backup-help">Copy your list from this device, then paste it into <strong>Restore</strong> on your other phone.</p>
       <label for="backup-export">Your list</label>
       <textarea id="backup-export" class="backup-text" rows="4" readonly></textarea>
       <div class="backup-actions">
@@ -187,6 +187,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="config.js?v=2"></script>
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>

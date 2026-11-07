@@ -216,14 +216,6 @@
     return stock;
   }
 
-  // Replace the whole shared list in one write (used by Restore).
-  function cloudReplaceAll(list) {
-    const code = familyCode;
-    ensureFirebase()
-      .then(() => familyRef(code).update({ stock: stockMap(list) }))
-      .catch(reportSyncError);
-  }
-
   // ---------- Init ----------
   function init() {
     if (isCloud()) {
@@ -658,6 +650,12 @@
     backupExport.value = buildBackup();
     backupImport.value = '';
     setBackupStatus('');
+    const shared = isCloud();
+    backupRestoreSection.hidden = shared;
+    document.getElementById('backup-title').textContent = shared ? 'Back up your list' : 'Backup & restore';
+    document.getElementById('backup-help').innerHTML = shared
+      ? 'Your list is already saved online, so you don&rsquo;t need this. It just gives you a text copy to keep if you want one.'
+      : 'Copy your list from this device, then paste it into <strong>Restore</strong> on your other phone.';
     backupShareBtn.hidden = !navigator.share;
     backupModal.hidden = false;
   }
@@ -679,12 +677,11 @@
   function restoreBackup() {
     const result = parseBackup(backupImport.value.trim());
     if (result.error) { setBackupStatus(result.error, true); return; }
-    const where = isCloud() ? 'the shared list (everyone using it will see this)' : 'this device';
-    if (!confirm(`Replace everything on ${where} with the ${result.items.length} items in this backup?`)) return;
+    if (isCloud()) { setBackupStatus('Restore is only for a list that lives on this phone.', true); return; }
+    if (!confirm(`Replace everything on this device with the ${result.items.length} items in this backup?`)) return;
     finalizePendingDelete();
     items = result.items.map((it) => ({ id: uid(), ...it }));
-    if (isCloud()) cloudReplaceAll(items);
-    else localSave(items);
+    localSave(items);
     render();
     backupImport.value = '';
     backupExport.value = buildBackup();
@@ -730,6 +727,7 @@
     syncLocalView.hidden = cloud;
     syncCloudView.hidden = !cloud;
     syncCodeDisplay.textContent = familyCode || '';
+    backupBtn.textContent = cloud ? 'Back up list' : 'Backup & restore';
   }
 
   function openSyncModal() {

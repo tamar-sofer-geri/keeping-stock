@@ -29,7 +29,8 @@ By default the list lives **only in that phone's browser** (local mode). The ☁
 - **Create shared list** uploads this phone's current list and gives you an 8-character code. **Invite** sends the code (and how to use it) through whatever share sheet you pick.
 - On the other phone, tap ☁️ → **Join** and enter the code. Both phones then show the same list, and changes appear on the other phone within moments.
 - **Stop syncing on this phone** returns it to a local list (it keeps a copy of what it was showing); the shared list stays online for everyone else.
-- The ☁️ button is filled in when a phone is using a shared list. **Backup & restore** also works on a shared list (Restore replaces it for everyone).
+- The ☁️ button turns a solid color with a green ✓ when a phone is using a shared list; a plain white circle means the list is only on that phone.
+- **Backup & restore** is for a list that lives on one phone. On a shared list the link becomes **Back up list** (copy only) — Restore isn't offered there, so nobody can accidentally overwrite everyone's list.
 
 ### How it's stored
 
