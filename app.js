@@ -344,6 +344,8 @@
     let startY = 0;
     let dragging = false;
     let swiping = false;
+    let hideStripTimer = null;
+    const wrap = row.parentElement;
 
     row.addEventListener('pointerdown', (e) => {
       if (e.button !== undefined && e.button !== 0) return;
@@ -361,6 +363,8 @@
       if (!swiping) {
         if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
           swiping = true;
+          clearTimeout(hideStripTimer);
+          wrap.classList.add('is-swiping');
           row.setPointerCapture(e.pointerId);
         } else if (Math.abs(dy) > 8) {
           dragging = false;
@@ -387,6 +391,8 @@
         setTimeout(() => swipeDeleteItem(item), 150);
       } else {
         row.style.transform = 'translateX(0)';
+        // hide the red strip again once the row has slid back over it
+        hideStripTimer = setTimeout(() => wrap.classList.remove('is-swiping'), 250);
       }
     }
 

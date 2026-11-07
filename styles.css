@@ -152,7 +152,11 @@ html, body {
   overflow: hidden;
 }
 
+/* Only painted while a row is being swiped. It is exactly as big as the row, so
+   left visible at rest its edge can leak past the row's anti-aliased border as a
+   faint red/purple line on some rows (depends on pixel alignment). */
 .item-row-delete-bg {
+  visibility: hidden;
   position: absolute;
   inset: 0;
   border-radius: 14px;
@@ -164,6 +168,8 @@ html, body {
   font-weight: 700;
   font-size: 14px;
 }
+
+.item-row-wrap.is-swiping .item-row-delete-bg { visibility: visible; }
 
 .item-row {
   position: relative;
