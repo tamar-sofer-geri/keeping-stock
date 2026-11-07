@@ -87,10 +87,10 @@ html, body {
   justify-content: center;
 }
 .header-icon-btn:active { transform: scale(0.92); }
-/* Unmistakable when this phone is using the shared list: solid color + a green check.
+/* When this phone is using the shared list: a softly tinted circle plus a green check.
    Not shared = plain white circle with just an outline. */
 .header-icon-btn.is-shared {
-  background: var(--accent-strong);
+  background: var(--accent);
 }
 .header-icon-btn.is-shared::after {
   content: '✓';
